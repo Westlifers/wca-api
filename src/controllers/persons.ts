@@ -1,4 +1,4 @@
-import { PersonService } from '@/services/persons';
+import { PersonService } from '@/services/persons2';
 import { internalServerError, notFound, ok } from '@/utils/response';
 import { Request, Response } from 'express';
 
