@@ -18,7 +18,7 @@ curl https://wca-proxy.niekh.com/api/v1/records/3x3x3
 
 Sample response
 
-```
+```json
 {
   "record": {
     "event": "3x3x3 Cube",
@@ -46,7 +46,7 @@ curl https://wca-proxy.niekh.com/api/v1/persons/2009ZEMD01
 
 Sample response
 
-```
+```json
 {
   "person": {
     "id": "2009ZEMD01",
@@ -71,6 +71,36 @@ Sample response
           "worldRecord": "8"
         }
       },
+```
+
+If there are more than 1 person searched
+
+```bash
+curl https://wca-proxy.niekh.com/api/v1/persons/jack
+```
+
+you shall get a response like this:
+
+Sample response
+
+```json
+{
+  "person":{
+    "total":1048,
+    "rows":[
+      {"name":"Adam Jack Harrison","wca_id":"2022HARR24"},
+      {"name":"Aiden Lee Jackson","wca_id":"2022JACK04"},
+      {"name":"Alix Jack","wca_id":"2016JACK05"},
+      {"name":"Archie Jack Crebbin","wca_id":"2019CREB01"},
+      {"name":"Ash Jackson Duffy","wca_id":"2019DUFF01"},
+      {"name":"Beau Jackson","wca_id":"2022JACK02"},
+      {"name":"Ben Jackson","wca_id":"2015JACK02"},
+      {"name":"Ben Jackson","wca_id":"2021JACK01"},
+      {"name":"Benjamin Jackson","wca_id":"2018JACK02"},
+      {"name":"Benjamin Jackson","wca_id":"2020JACK01"}
+    ]
+  }
+}
 ```
 
 ## Technical details
