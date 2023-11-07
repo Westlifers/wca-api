@@ -1,33 +1,36 @@
-import { scrapeWebpage, scrapeWebpageWaitingForUserList } from '@/lib/scraper';
+import { scrapeWebpage, searchUser } from '@/lib/scraper';
 import { createEventSlug, maybeCastedAsNumber, slugify } from '@/utils';
 import { CheerioAPI } from 'cheerio';
 import { getCacheData, setCacheData } from '@/lib/redis';
 import { NotFoundError } from '@/errors/not-found';
 
 export class PersonService {
-  public async getPerson(idOrName: string) {
-    if (!idOrName) {
+  public async getPerson(keyWord: string) {
+    if (!keyWord) {
       throw new Error('No ID or name provided');
     }
 
-    const cacheHit = await getCacheData(`person-${idOrName}`);
+    const cacheHit = await getCacheData(`person-${keyWord}`);
     if (cacheHit) return cacheHit;
 
 
-    const s = await scrapeWebpageWaitingForUserList(process.env.WCA_HOST + `/persons?page=1&search=${idOrName}`);
-    const isAmbiguous = this.checkIsAmbiguous(s);
+    const searchResultList = await searchUser(process.env.WCA_HOST + `/persons?search=${keyWord}&order=asc&offset=0&limit=10&region=all`);
+    const resultCount = searchResultList['total'];
+    const isAmbiguous = resultCount > 1 ? 1 : (resultCount == 1 ? 0 : -1);  // 1 for ambiguous, 0 for not unique, -1 for not found
 
     if (isAmbiguous == 1) {
-      const nameIdList = this.getUserNameAndIdList(s);
-      // cache the list
-      await setCacheData(`person-${idOrName}`, nameIdList);
+      const nameIdList = searchResultList['rows'];
+      // cache the list by keyWord
+      await setCacheData(`person-${keyWord}`, nameIdList);
       return nameIdList;
     }
     else if (isAmbiguous == 0) {
-      const id = this.getUserId(s);
-      // cache the id
+      const id = searchResultList['rows'][0]['wca_id'];
+      console.log(searchResultList);
+      // cache the result by id and keyWord
       const userData = await this.getPersonById(id);
-      await setCacheData(`person-${idOrName}`, userData);
+      await setCacheData(`person-${keyWord}`, userData);
+      await setCacheData(`person-${id}`, userData);
       return userData;
     }
     else {
@@ -36,47 +39,19 @@ export class PersonService {
 
   }
 
-  private checkIsAmbiguous($: CheerioAPI) {
-    const table = $('.fixed-table-body table tbody').children().toArray();
 
-    // 1 for ambiguous, 0 for not ambiguous, -1 for not found
-    if (table.length > 1) return 1
-    else if (table.length == 1) return 0
-    else return -1
-  }
-
-  // if isAmbiguous == 1, then get the list of names and ids
-  private getUserNameAndIdList($: CheerioAPI): {name: string, id: string}[] {
-    const table = $('.fixed-table-body table tbody').children().toArray();
-    const nameIdList = table.map((row) => {
-      const name = $(row).find('td').eq(0).text().trim();
-      const id = $(row).find('td').eq(1).text().trim();
-      return {name, id};
-    })
-    return nameIdList;
-  }
-
-  // if isAmbiguous == 0, then get the id
-  private getUserId($: CheerioAPI): string {
-    const table = $('.fixed-table-body table tbody').children().toArray()
-    const id = $(table[0]).find('td').eq(1).text().trim();
-    return id;
-  }
-
-
-
-  // old code
+  // old code for searching by id
   private async getPersonById(id: string) {
     
-    if (!id) {
-      throw new Error('No ID provided');
-    }
+    // if (!id) {
+    //   throw new Error('No ID provided');
+    // }
 
-    const cacheHit = await getCacheData(`person-${id}`);
+    // const cacheHit = await getCacheData(`person-${id}`);
 
-    if (cacheHit) {
-      return cacheHit;
-    }
+    // if (cacheHit) {
+    //   return cacheHit;
+    // }
 
     const $ = await scrapeWebpage(process.env.WCA_HOST + `/persons/${id}`);
     const name = this.getUserName($);
@@ -90,7 +65,7 @@ export class PersonService {
       personalRecords,
     };
 
-    await setCacheData(`person-${id}`, data);
+    // await setCacheData(`person-${id}`, data);
 
     return data;
   }

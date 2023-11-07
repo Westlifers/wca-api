@@ -1,5 +1,4 @@
 import * as cheerio from 'cheerio';
-import puppeteer from 'puppeteer';
 
 export const scrapeWebpage = async (url: string) => {
   const response = await fetch(url);
@@ -7,19 +6,33 @@ export const scrapeWebpage = async (url: string) => {
   return cheerio.load(html);
 };
 
-export const scrapeWebpageWaitingForUserList = async (url: string) => {
-  // Launch the browser and open a new blank page
-  const browser = await puppeteer.launch({ headless: true });
-  const page = await browser.newPage();
 
-  // Navigate the page to a URL
-  await page.goto(url);
-
-  // Wait for the required DOM to be rendered
-  await page.waitForSelector('td.name');
-
-  // return the html
-  const html = await page.content();
-  await browser.close();
-  return cheerio.load(html);
+interface searchResult {
+  'total': number,
+  'rows': {
+    'name': string,
+    'wca_id': string
+  }[]
+}
+export const searchUser = async (url: string): Promise<searchResult> => {
+  const headers = {
+    'Accept': 'application/json, text/javascript, */*; q=0.1',
+    'X-Requested-With': 'XMLHttpRequest'
+  }
+  // curl.exe --request GET --url 'https://www.worldcubeassociation.org/persons?search=&order=asc&offset=0&limit=10&region=all' 
+  //   --header 'Accept: application/json, text/javascript, */*; q=0.1' 
+  //   --header 'X-Requested-With: XMLHttpRequest'
+  const response = await fetch(url, {headers});
+  const rawResult = await response.json();
+  const nameIdList = {
+    'total': rawResult['total'],
+    'rows': rawResult['rows'].map((row: any) => {
+      return {
+        // 'name' starts with pattern '\u003ca href=\"/persons/.*\"\u003e' and ends with '\u003c/a\u003e', so we need to remove them
+        'name': row['name'].replace(/\u003ca href=\"\/persons\/.*\"\u003e/g, '').replace(/\u003c\/a\u003e/g, ''),
+        'wca_id': row['wca_id']
+      }
+    })
+  }
+  return nameIdList;
 }
