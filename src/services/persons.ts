@@ -1,20 +1,56 @@
-import { scrapeWebpage } from '@/lib/scraper';
-import { createEventSlug, maybeCastedAsNumber, slugify } from '@/utils';
+import { scrapeWebpage, searchUser } from '@/lib/scraper';
+import { createEventSlug, maybeCastedAsNumber } from '@/utils';
 import { CheerioAPI } from 'cheerio';
 import { getCacheData, setCacheData } from '@/lib/redis';
 import { NotFoundError } from '@/errors/not-found';
 
 export class PersonService {
-  public async getPerson(id: string) {
-    if (!id) {
-      throw new Error('No ID provided');
+  public async getPerson(keyWord: string) {
+    if (!keyWord) {
+      throw new Error('No ID or name provided');
     }
 
-    const cacheHit = await getCacheData(`person-${id}`);
+    const cacheHit = await getCacheData(`person-${keyWord}`);
+    if (cacheHit) return cacheHit;
 
-    if (cacheHit) {
-      return cacheHit;
+
+    const searchResultList = await searchUser(process.env.WCA_HOST + `/persons?search=${keyWord}&order=asc&offset=0&limit=10&region=all`);
+    const resultCount = searchResultList['total'];
+    const isAmbiguous = resultCount > 1 ? 1 : (resultCount == 1 ? 0 : -1);  // 1 for ambiguous, 0 for not unique, -1 for not found
+
+    if (isAmbiguous == 1) {
+      // cache the list by keyWord
+      await setCacheData(`person-${keyWord}`, searchResultList);
+      return searchResultList;
     }
+    else if (isAmbiguous == 0) {
+      const id = searchResultList['rows'][0]['wca_id'];
+      console.log(searchResultList);
+      // cache the result by id and keyWord
+      const userData = await this.getPersonById(id);
+      await setCacheData(`person-${keyWord}`, userData);
+      await setCacheData(`person-${id}`, userData);
+      return userData;
+    }
+    else {
+      throw new NotFoundError('User not found')
+    }
+
+  }
+
+
+  // old code for searching by id
+  private async getPersonById(id: string) {
+    
+    // if (!id) {
+    //   throw new Error('No ID provided');
+    // }
+
+    // const cacheHit = await getCacheData(`person-${id}`);
+
+    // if (cacheHit) {
+    //   return cacheHit;
+    // }
 
     const $ = await scrapeWebpage(process.env.WCA_HOST + `/persons/${id}`);
     const name = this.getUserName($);
@@ -28,7 +64,7 @@ export class PersonService {
       personalRecords,
     };
 
-    await setCacheData(`person-${id}`, data);
+    // await setCacheData(`person-${id}`, data);
 
     return data;
   }
@@ -89,4 +125,5 @@ export class PersonService {
 
     return personalRecords;
   }
+
 }
